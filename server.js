@@ -8,15 +8,63 @@ const SESSION_SECRET = crypto
   .update(PASSWORD || '4k-scout-default-secret')
   .digest('hex');
 
-// 默认预置的高纯度 4K 原盘/网盘资源源（可通过环境变量 CUSTOM_SITES 覆盖，也可在网页端随时增删）
+// v2.0 默认预置的高纯度 4K 原盘/网盘资源源（可通过环境变量 CUSTOM_SITES 覆盖，也可在网页端随时增删）
 const DEFAULT_SITES = [
+  {
+    id: 'web-yinfans',
+    name: '音范丝 (4K蓝光原盘)',
+    type: 'web',
+    url: 'https://www.yinfans.me/?s={kw}',
+    enabled: true,
+    note: '4K蓝光原盘/REMUX 磁力主力（支持迅雷离线秒存）'
+  },
+  {
+    id: 'tg-dianying4k',
+    name: '4K影视屋 (蓝光无损)',
+    type: 'tg',
+    url: 'https://t.me/s/dianying4k',
+    enabled: true,
+    note: 'TG频道 · 4K原盘/115/迅雷/夸克'
+  },
   {
     id: 'tg-yunpanxunlei',
     name: '迅雷4K原盘频道',
     type: 'tg',
     url: 'https://t.me/s/yunpanxunlei',
     enabled: true,
-    note: 'TG频道 · 主打迅雷网盘4K原盘'
+    note: 'TG频道 · 迅雷网盘4K高码率'
+  },
+  {
+    id: 'tg-yunpan189',
+    name: '天翼云盘4K频道',
+    type: 'tg',
+    url: 'https://t.me/s/yunpan189',
+    enabled: true,
+    note: 'TG频道 · 天翼云盘不限速4K'
+  },
+  {
+    id: 'tg-yunpans',
+    name: '夸克影视资源频道',
+    type: 'tg',
+    url: 'https://t.me/s/yunpans',
+    enabled: true,
+    note: 'TG频道 · 夸克网盘影视'
+  },
+  {
+    id: 'tg-baidudisk',
+    name: '百度网盘影视频道',
+    type: 'tg',
+    url: 'https://t.me/s/BaiduCloudDisk',
+    enabled: true,
+    note: 'TG频道 · 百度网盘资源'
+  },
+  {
+    id: 'tg-yunpan139',
+    name: '移动云盘影视频道',
+    type: 'tg',
+    url: 'https://t.me/s/yunpan139',
+    enabled: true,
+    note: 'TG频道 · 移动云盘4K'
   },
   {
     id: 'tg-tgsearchers4',
@@ -24,31 +72,15 @@ const DEFAULT_SITES = [
     type: 'tg',
     url: 'https://t.me/s/tgsearchers4',
     enabled: true,
-    note: 'TG频道 · 综合影视资源'
+    note: 'TG频道 · 多网盘综合检索'
   },
   {
     id: 'tg-ydypzyfx',
-    name: '移动/天翼/夸克影视分享',
+    name: '多网盘4K剧集分享',
     type: 'tg',
     url: 'https://t.me/s/ydypzyfx',
     enabled: true,
-    note: 'TG频道 · 多网盘4K剧集'
-  },
-  {
-    id: 'web-aq',
-    name: 'AQ天翼4K专区',
-    type: 'web',
-    url: 'https://wpzy.cc/search?q={kw}',
-    enabled: true,
-    note: '网页站 · 需抓取详情提取网盘链接'
-  },
-  {
-    id: 'web-leijing',
-    name: '雷鲸小站(天翼4K)',
-    type: 'web',
-    url: 'https://www.leijing.xyz/search?keyword={kw}',
-    enabled: true,
-    note: '网页站 · 4K原盘/杜比视界主力'
+    note: 'TG频道 · 移动/天翼/夸克'
   }
 ];
 
@@ -61,16 +93,15 @@ function getInitialSites() {
       console.error('CUSTOM_SITES JSON 解析失败，使用默认站点:', e.message);
     }
   }
-  return DEFAULT_SITES;
+  return DEFAULT_SITES.map((s) => ({ ...s }));
 }
 
-// 内存运行时站点列表（支持前端增删改，重启后恢复环境变量/默认列表）
 let runtimeSites = getInitialSites();
 
 const USER_AGENT =
   'Mozilla/5.0 (Linux; Android 14; Redmi K70) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
 
-// 网盘链接识别正则
+// 网盘 + 磁力链接识别正则
 const PAN_PATTERNS = [
   { pan: '迅雷', color: '#2563eb', regex: /https?:\/\/pan\.xunlei\.com\/s\/[A-Za-z0-9_-]+(?:\?pwd=[A-Za-z0-9]+)?/gi },
   { pan: '天翼', color: '#ea580c', regex: /https?:\/\/cloud\.189\.cn\/(?:t|web\/share)\/[A-Za-z0-9]+(?:\?[^\s"'<>]+)?/gi },
@@ -78,41 +109,65 @@ const PAN_PATTERNS = [
   { pan: '阿里', color: '#d97706', regex: /https?:\/\/(?:www\.)?(?:alipan|aliyundrive)\.com\/s\/[A-Za-z0-9]+/gi },
   { pan: '115', color: '#0891b2', regex: /https?:\/\/(?:115|115cdn)\.com\/s\/[A-Za-z0-9]+(?:\?password=[A-Za-z0-9]+)?/gi },
   { pan: '123', color: '#059669', regex: /https?:\/\/(?:www\.)?123(?:pan|684|865)\.com\/s\/[A-Za-z0-9-]+/gi },
-  { pan: '百度', color: '#dc2626', regex: /https?:\/\/pan\.baidu\.com\/s\/[A-Za-z0-9_-]+(?:\?pwd=[A-Za-z0-9]+)?/gi }
+  { pan: '百度', color: '#dc2626', regex: /https?:\/\/pan\.baidu\.com\/s\/[A-Za-z0-9_-]+(?:\?pwd=[A-Za-z0-9]+)?/gi },
+  { pan: '磁力', color: '#475569', regex: /magnet:\?xt=urn:btih:[A-Za-z0-9]{32,40}[^\s"'<>]*/gi }
 ];
 
-// 提取文件大小并换算成 MB 便于排序和过滤
-function extractSizeInfo(text) {
-  if (!text) return { sizeText: '未知大小', sizeMB: 0 };
-  const matches = [...text.matchAll(/(\d+(?:\.\d{1,2})?)\s*(TB|T|GB|G|MB|M)\b/gi)];
-  if (matches.length === 0) return { sizeText: '未知大小', sizeMB: 0 };
+// 过滤电子书/软件/文档等非影视噪声
+const NOISE_REGEX = /\.(?:epub|mobi|azw3|pdf|exe|apk|dmg|zip|rar)\b|电子书|有声书|网盘课程|教程合集|考研|考公|字体包|壁纸包/i;
 
+function isNoisePost(title, kw) {
+  if (NOISE_REGEX.test(kw)) return false;
+  return NOISE_REGEX.test(title);
+}
+
+// 提取文件大小（支持文本内的 GB/TB/MB 以及磁力链接里的 xl= 字节数）
+function extractSizeInfo(text, rawUrls = []) {
   let bestMB = 0;
   let bestText = '未知大小';
-  for (const m of matches) {
-    const val = parseFloat(m[1]);
-    const unit = m[2].toUpperCase();
-    let mb = 0;
-    if (unit === 'TB' || unit === 'T') mb = val * 1024 * 1024;
-    else if (unit === 'GB' || unit === 'G') mb = val * 1024;
-    else mb = val;
 
-    // 过滤掉明显不是影片体积的极小数值（如 1M）
-    if (mb > bestMB && mb >= 50) {
-      bestMB = mb;
-      const normUnit = unit.length === 1 ? unit + 'B' : unit;
-      bestText = `${val}${normUnit}`;
+  if (text) {
+    const matches = [...text.matchAll(/(\d+(?:\.\d{1,2})?)\s*(TB|T|GB|G|MB|M)\b/gi)];
+    for (const m of matches) {
+      const val = parseFloat(m[1]);
+      const unit = m[2].toUpperCase();
+      let mb = 0;
+      if (unit === 'TB' || unit === 'T') mb = val * 1024 * 1024;
+      else if (unit === 'GB' || unit === 'G') mb = val * 1024;
+      else mb = val;
+
+      // 过滤掉明显不是影片体积的极小数值或年份/编码误匹配
+      if (mb > bestMB && mb >= 100 && mb <= 50 * 1024 * 1024) {
+        bestMB = mb;
+        const normUnit = unit.length === 1 ? unit + 'B' : unit;
+        bestText = `${val}${normUnit}`;
+      }
     }
   }
+
+  // 若文本未标大小，尝试从磁力链接 xl= 字节参数换算
+  if (bestMB === 0 && rawUrls.length > 0) {
+    for (const u of rawUrls) {
+      const xlMatch = u.match(/[?&]xl=(\d+)/i);
+      if (xlMatch) {
+        const bytes = Number(xlMatch[1]);
+        if (bytes > 100 * 1024 * 1024) {
+          bestMB = bytes / (1024 * 1024);
+          bestText = bestMB >= 1024 ? `${(bestMB / 1024).toFixed(2)}GB` : `${Math.round(bestMB)}MB`;
+          break;
+        }
+      }
+    }
+  }
+
   return { sizeText: bestText, sizeMB: Math.round(bestMB) };
 }
 
-// 提取 4K / 原盘 / HDR / 杜比等画质标签
 function extractQualityTags(text) {
   const tags = [];
   const rules = [
-    ['4K/2160P', /4K|2160P/i],
-    ['原盘/REMUX', /原盘|REMUX|BDMV|ISO|蓝光/i],
+    ['4K/2160P', /4K|2160P|UHD/i],
+    ['原盘/REMUX', /原盘|REMUX|BDMV|ISO|蓝光|BluRay/i],
     ['杜比视界', /杜比|Dolby|DV\b/i],
     ['HDR', /HDR10?\+?/i],
     ['高码率', /高码|HQ|60FPS/i]
@@ -123,7 +178,6 @@ function extractQualityTags(text) {
   return tags;
 }
 
-// 提取文本中的网盘链接与提取码
 function extractPanLinks(text) {
   const found = [];
   const seen = new Set();
@@ -137,9 +191,30 @@ function extractPanLinks(text) {
       }
     }
   }
-  // 顺便提取常见 4 位提取码
   const pwdMatch = text.match(/(?:提取码|访问码|密码|pwd)[：:\s]*([A-Za-z0-9]{4})/i);
   return { links: found, pwd: pwdMatch ? pwdMatch[1] : '' };
+}
+
+// 相关性打分：标题命中远高于正文顺带提及，4K/原盘/有明确大小加分
+function calcRelevanceScore(title, body, kw, sizeMB, tags) {
+  const kwLower = kw.toLowerCase();
+  const titleLower = title.toLowerCase();
+  const bodyLower = body.toLowerCase();
+  let score = 0;
+
+  if (titleLower.includes(kwLower)) score += 100;
+  else {
+    // 拆分多词或短词匹配
+    const tokens = kwLower.split(/\s+/).filter(Boolean);
+    const hitCount = tokens.filter((t) => titleLower.includes(t)).length;
+    if (hitCount > 0) score += 60 * (hitCount / tokens.length);
+    else if (bodyLower.includes(kwLower)) score += 10;
+  }
+
+  if (tags.length > 0) score += tags.length * 12;
+  if (sizeMB >= 10240) score += 25;
+  else if (sizeMB > 0) score += 10;
+  return Math.round(score);
 }
 
 function stripHtml(html) {
@@ -190,19 +265,25 @@ async function searchTelegramChannel(site, kw) {
     const textMatch = block.match(/class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
     if (!textMatch) continue;
     const rawBlock = textMatch[1];
-    // 同时从 href 和纯文本里提取链接
-    const hrefs = [...rawBlock.matchAll(/href="(https?:\/\/[^"]+)"/gi)].map((m) => m[1]);
+    const hrefs = [...rawBlock.matchAll(/href="(https?:\/\/[^"]+|magnet:[^"]+)"/gi)].map((m) => m[1]);
     const plain = stripHtml(rawBlock);
     const combined = `${plain}\n${hrefs.join('\n')}`;
     const { links, pwd } = extractPanLinks(combined);
     if (links.length === 0) continue;
 
     const lines = plain.split('\n').map((l) => l.trim()).filter(Boolean);
-    const title = (lines[0] || kw).slice(0, 90);
-    const { sizeText, sizeMB } = extractSizeInfo(plain);
-    const tags = extractQualityTags(plain);
+    const title = (lines[0] || kw).slice(0, 95);
+    if (isNoisePost(title, kw)) continue;
 
+    // 严格要求标题或前两行明确包含关键词（避免书评/杂谈正文顺带提及的误匹配）
+    const headText = lines.slice(0, 2).join(' ').toLowerCase();
+    if (!headText.includes(kw.toLowerCase())) continue;
+
+    const { sizeText, sizeMB } = extractSizeInfo(plain, links.map((l) => l.url));
+    const tags = extractQualityTags(plain);
+    const score = calcRelevanceScore(title, plain, kw, sizeMB, tags);
     const timeMatch = block.match(/datetime="([^"]+)"/i);
+
     results.push({
       source: site.name,
       sourceType: 'TG频道',
@@ -213,6 +294,7 @@ async function searchTelegramChannel(site, kw) {
       tags,
       links,
       pwd,
+      score,
       date: timeMatch ? timeMatch[1].slice(0, 10) : '',
       pageUrl: searchUrl
     });
@@ -231,23 +313,26 @@ async function searchOnlineDoc(site, kw) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line.toLowerCase().includes(kwLower)) continue;
-    // 取上下文三行合并提取大小和链接
-    const windowText = lines.slice(Math.max(0, i - 1), Math.min(lines.length, i + 3)).join('\n');
+    if (isNoisePost(line, kw)) continue;
+
+    const windowText = lines.slice(Math.max(0, i - 1), Math.min(lines.length, i + 4)).join('\n');
     const { links, pwd } = extractPanLinks(windowText);
     if (links.length === 0) continue;
 
-    const { sizeText, sizeMB } = extractSizeInfo(windowText);
+    const { sizeText, sizeMB } = extractSizeInfo(windowText, links.map((l) => l.url));
     const tags = extractQualityTags(windowText);
+    const score = calcRelevanceScore(line, windowText, kw, sizeMB, tags);
     results.push({
       source: site.name,
       sourceType: '在线文档',
-      title: line.slice(0, 90),
+      title: line.slice(0, 95),
       snippet: windowText.slice(0, 220),
       sizeText,
       sizeMB,
       tags,
       links,
       pwd,
+      score,
       date: '',
       pageUrl: site.url
     });
@@ -256,34 +341,36 @@ async function searchOnlineDoc(site, kw) {
   return results;
 }
 
-// 3. 解析通用网页搜索站 (type === 'web', url 包含 {kw})
+// 3. 解析通用网页搜索站（兼容 WordPress 如音范丝 / 论坛 / 详情页磁力与网盘提取）
 async function searchWebSite(site, kw) {
   const searchUrl = site.url.replace('{kw}', encodeURIComponent(kw));
   const origin = new URL(searchUrl).origin;
-  const html = await fetchText(searchUrl, 10000);
+  const html = await fetchText(searchUrl, 12000);
   const results = [];
 
-  // 如果搜索结果页本身已经带网盘直链
+  // 如果搜索结果页本身已直接包含网盘/磁力链接
   const directPlain = stripHtml(html);
   const directPan = extractPanLinks(`${directPlain}\n${html}`);
   if (directPan.links.length > 0 && directPlain.toLowerCase().includes(kw.toLowerCase())) {
-    const { sizeText, sizeMB } = extractSizeInfo(directPlain);
+    const { sizeText, sizeMB } = extractSizeInfo(directPlain, directPan.links.map((l) => l.url));
+    const tags = extractQualityTags(directPlain);
     results.push({
       source: site.name,
       sourceType: '网页站',
-      title: `${site.name} - ${kw} 搜索结果`,
+      title: `${site.name} - ${kw}`,
       snippet: directPlain.slice(0, 180),
       sizeText,
       sizeMB,
-      tags: extractQualityTags(directPlain),
-      links: directPan.links.slice(0, 6),
+      tags,
+      links: directPan.links.slice(0, 8),
       pwd: directPan.pwd,
+      score: calcRelevanceScore(kw, directPlain, kw, sizeMB, tags),
       date: '',
       pageUrl: searchUrl
     });
   }
 
-  // 提取匹配关键词的帖子详情页链接（最多并发抓前 5 个帖子）
+  // 提取匹配关键词的帖子详情页链接（优先抓取 h1/h2/h3 标题链接或包含关键词的链接，最多前 8 篇）
   const anchorRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   const candidatePosts = [];
   const seenUrls = new Set();
@@ -294,21 +381,23 @@ async function searchWebSite(site, kw) {
     const anchorText = stripHtml(m[2]);
     if (!anchorText || anchorText.length < 2) continue;
     if (!anchorText.toLowerCase().includes(kwLower)) continue;
+    if (isNoisePost(anchorText, kw)) continue;
     if (/^(javascript:|#|mailto:)/i.test(href)) continue;
     if (href.startsWith('/')) href = origin + href;
     else if (!/^https?:\/\//i.test(href)) continue;
+    if (href === searchUrl || /[?&](?:s|q|keyword|page)=/i.test(href)) continue;
     if (seenUrls.has(href)) continue;
     seenUrls.add(href);
-    candidatePosts.push({ title: anchorText.slice(0, 90), url: href });
-    if (candidatePosts.length >= 5) break;
+    candidatePosts.push({ title: anchorText.slice(0, 95), url: href });
+    if (candidatePosts.length >= 8) break;
   }
 
   const detailResults = await Promise.allSettled(
     candidatePosts.map(async (post) => {
-      const detailHtml = await fetchText(post.url, 8000);
+      const detailHtml = await fetchText(post.url, 10000);
       const detailText = stripHtml(detailHtml);
       const { links, pwd } = extractPanLinks(`${detailText}\n${detailHtml}`);
-      const { sizeText, sizeMB } = extractSizeInfo(`${post.title} ${detailText}`);
+      const { sizeText, sizeMB } = extractSizeInfo(`${post.title} ${detailText}`, links.map((l) => l.url));
       const tags = extractQualityTags(`${post.title} ${detailText}`);
       return {
         source: site.name,
@@ -318,8 +407,9 @@ async function searchWebSite(site, kw) {
         sizeText,
         sizeMB,
         tags,
-        links,
+        links: links.slice(0, 10),
         pwd,
+        score: calcRelevanceScore(post.title, detailText, kw, sizeMB, tags),
         date: '',
         pageUrl: post.url
       };
@@ -347,7 +437,6 @@ async function searchSingleSite(site, kw) {
   }
 }
 
-// 简易 Cookie 会话校验（仅当设置 PASSWORD 时启用）
 function isAuthenticated(req) {
   if (!PASSWORD) return true;
   const cookie = req.headers.cookie || '';
@@ -378,13 +467,12 @@ function sendJson(res, status, data, extraHeaders = {}) {
   res.end(JSON.stringify(data));
 }
 
-// 内置移动端极简暗色 UI（单文件内置，零静态目录配置问题）
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>4K原盘资源聚合搜索</title>
+<title>4K原盘资源聚合搜索 v2</title>
 <style>
   :root {
     --bg: #0b0f17;
@@ -435,7 +523,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     color: var(--muted); padding: 5px 11px; border-radius: 99px; font-size: 12px; cursor: pointer;
   }
   .chip.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-  .status-strip { padding: 6px 14px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; }
+  .status-strip { padding: 6px 14px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; max-width: 860px; margin: 0 auto; }
   .container { padding: 8px 14px; display: flex; flex-direction: column; gap: 10px; max-width: 860px; margin: 0 auto; }
   .card {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
@@ -506,11 +594,11 @@ const HTML_PAGE = `<!DOCTYPE html>
 
 <div class="topbar">
   <div class="brand-row">
-    <div class="brand">🎬 4K原盘聚合搜 <span class="badge-4k">巡影模式</span></div>
+    <div class="brand">🎬 4K原盘聚合搜 <span class="badge-4k">v2.0</span></div>
     <button class="btn-icon" onclick="openDrawer()">⚙️ 站点管理 (<span id="siteCount">0</span>)</button>
   </div>
   <div class="search-box">
-    <input id="kwInput" class="search-input" placeholder="输入片名，如：沙丘2 / 繁花 / 奥本海默" onkeydown="if(event.key==='Enter')doSearch()" />
+    <input id="kwInput" class="search-input" placeholder="输入片名，如：复仇者联盟 / 沙丘2 / 奥本海默" onkeydown="if(event.key==='Enter')doSearch()" />
     <button id="searchBtn" class="search-btn" onclick="doSearch()">搜索</button>
   </div>
 </div>
@@ -519,24 +607,25 @@ const HTML_PAGE = `<!DOCTYPE html>
   <div class="chip active" onclick="setFilter('all', this)">全部结果</div>
   <div class="chip" onclick="setFilter('4k', this)">仅看 4K / 大体积(&gt;10GB)</div>
   <div class="chip" onclick="setFilter('迅雷', this)">⚡ 迅雷</div>
+  <div class="chip" onclick="setFilter('磁力', this)">🧲 磁力(原盘)</div>
   <div class="chip" onclick="setFilter('天翼', this)">☁️ 天翼</div>
   <div class="chip" onclick="setFilter('夸克', this)">🟣 夸克</div>
-  <div class="chip" onclick="setFilter('阿里', this)">🟠 阿里</div>
+  <div class="chip" onclick="setFilter('百度', this)">🔵 百度</div>
   <div class="chip" onclick="toggleSort(this)">📊 按体积从大到小</div>
 </div>
 
 <div class="status-strip" id="statusStrip"></div>
 <div class="container" id="resultsBox">
-  <div class="empty">输入影片名称一键并发检索多站 4K 原盘资源<br/>支持自定义网页站、TG 频道与在线文档清单</div>
+  <div class="empty">已内置 音范丝4K原盘 + 8大网盘TG主力频道<br/>自动过滤电子书等无关结果，支持按文件体积排序</div>
 </div>
 
 <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
 <div class="drawer" id="siteDrawer">
   <h3><span>自定义资源站点</span><button class="btn-icon" onclick="closeDrawer()">关闭</button></h3>
-  <div style="background:var(--panel);padding:10px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px">
+  <div style="background:var(--panel);padding:10px;border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
     <div class="form-group">
       <label>站点名称</label>
-      <input id="newSiteName" class="form-control" placeholder="例如：我的4K文档 / 某影视论坛" />
+      <input id="newSiteName" class="form-control" placeholder="例如：4K指南 / 我的电影文档" />
     </div>
     <div class="form-group">
       <label>站点类型</label>
@@ -548,14 +637,16 @@ const HTML_PAGE = `<!DOCTYPE html>
     </div>
     <div class="form-group">
       <label>地址 URL</label>
-      <input id="newSiteUrl" class="form-control" placeholder="https://example.com/search?q={kw}" />
+      <input id="newSiteUrl" class="form-control" placeholder="https://example.com/?s={kw}" />
     </div>
-    <button class="search-btn" style="width:100%;padding:9px;font-size:13px" onclick="addSite()">+ 添加新站点</button>
+    <button class="search-btn" style="width:100%;padding:9px;font-size:13px;margin-bottom:8px" onclick="addSite()">+ 添加新站点</button>
+    <button class="copy-btn" style="width:100%;padding:7px;font-size:12px" onclick="resetDefaultSites()">🔄 恢复默认内置站点 (9个)</button>
   </div>
   <div id="siteList"></div>
 </div>
 
 <script>
+const STORAGE_KEY = 'custom_4k_sites_v2';
 let allItems = [];
 let currentPanFilter = 'all';
 let sortBySize = false;
@@ -569,8 +660,7 @@ async function init() {
   }
   const data = await res.json();
   sites = data.sites || [];
-  // 合并本地浏览器保存的自定义站点
-  const localRaw = localStorage.getItem('custom_4k_sites');
+  const localRaw = localStorage.getItem(STORAGE_KEY);
   if (localRaw) {
     try {
       const localSites = JSON.parse(localRaw);
@@ -612,9 +702,18 @@ function renderSiteList() {
 }
 
 async function syncSites() {
-  localStorage.setItem('custom_4k_sites', JSON.stringify(sites));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
   await fetch('/api/sites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sites }) });
   renderSiteList();
+}
+
+async function resetDefaultSites() {
+  localStorage.removeItem(STORAGE_KEY);
+  const res = await fetch('/api/sites/reset', { method: 'POST' });
+  const data = await res.json();
+  sites = data.sites || [];
+  renderSiteList();
+  alert('已恢复默认 9 个精选 4K 站点');
 }
 
 async function addSite() {
@@ -639,8 +738,8 @@ async function doSearch() {
   if (!kw) return;
   const btn = document.getElementById('searchBtn');
   btn.disabled = true; btn.textContent = '搜索中...';
-  document.getElementById('statusStrip').innerHTML = '正在并发检索各站点...';
-  document.getElementById('resultsBox').innerHTML = '<div class="empty">正在抓取并解析资源体积与网盘链接...</div>';
+  document.getElementById('statusStrip').innerHTML = '正在并发检索 9 大站点...';
+  document.getElementById('resultsBox').innerHTML = '<div class="empty">正在抓取并解析资源体积与网盘/磁力链接...</div>';
 
   try {
     const res = await fetch('/api/search?kw=' + encodeURIComponent(kw));
@@ -661,7 +760,7 @@ async function doSearch() {
 
 function setFilter(val, el) {
   currentPanFilter = val;
-  document.querySelectorAll('.filter-bar .chip').forEach((c, i) => { if (i < 6) c.classList.remove('active'); });
+  document.querySelectorAll('.filter-bar .chip').forEach((c, i) => { if (i < 7) c.classList.remove('active'); });
   el.classList.add('active');
   renderResults();
 }
@@ -689,6 +788,8 @@ function renderResults() {
   }
   if (sortBySize) {
     list.sort((a, b) => b.sizeMB - a.sizeMB);
+  } else {
+    list.sort((a, b) => (b.score || 0) - (a.score || 0));
   }
   const box = document.getElementById('resultsBox');
   if (list.length === 0) {
@@ -703,6 +804,7 @@ function renderResults() {
       <button class="copy-btn" onclick="copyText('\${l.url}', this)">复制\${l.pan}</button>
     \`).join('');
     const pwdBadge = it.pwd ? \`<span class="tag q">提取码: \${it.pwd}</span>\` : '';
+    const detailBtn = it.pageUrl ? \`<a class="copy-btn" style="text-decoration:none" href="\${it.pageUrl}" target="_blank" rel="noopener">原帖</a>\` : '';
     return \`
       <div class="card">
         <div class="card-head">
@@ -716,7 +818,7 @@ function renderResults() {
           \${pwdBadge}
         </div>
         <div class="snippet">\${it.snippet}</div>
-        <div class="links-row">\${linksHtml}</div>
+        <div class="links-row">\${linksHtml}\${detailBtn}</div>
       </div>
     \`;
   }).join('');
@@ -764,6 +866,11 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 400, { ok: false, error: '格式错误' });
   }
 
+  if (reqUrl.pathname === '/api/sites/reset' && req.method === 'POST') {
+    runtimeSites = getInitialSites();
+    return sendJson(res, 200, { ok: true, sites: runtimeSites });
+  }
+
   if (reqUrl.pathname === '/api/search' && req.method === 'GET') {
     const kw = (reqUrl.searchParams.get('kw') || '').trim();
     if (!kw) return sendJson(res, 400, { error: '缺少关键词 kw' });
@@ -777,14 +884,14 @@ const server = http.createServer(async (req, res) => {
       siteStats.push({ name: r.name, ok: r.ok, ms: r.ms, count: r.items.length, error: r.error });
       items.push(...r.items);
     }
+    items.sort((a, b) => (b.score || 0) - (a.score || 0));
     return sendJson(res, 200, { kw, items, siteStats });
   }
 
-  // 默认返回内置单页 HTML
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(HTML_PAGE);
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`4K原盘聚合搜索服务已启动，监听端口: ${PORT}`);
+  console.log(`4K原盘聚合搜索服务 v2.0 已启动，监听端口: ${PORT}`);
 });
