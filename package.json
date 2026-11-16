@@ -1,0 +1,12 @@
+{
+  "name": "4k-scout-aggregator",
+  "version": "1.0.0",
+  "description": "4K原盘与网盘资源多站聚合搜索（单端口零依赖，适配Render免费部署）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
